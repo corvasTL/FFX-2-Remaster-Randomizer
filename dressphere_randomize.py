@@ -427,6 +427,7 @@ def initiate_dresspheres_new():
         new_dressphere.big_chunk = hex_chunks[index]
         this_dressphere_list.append(new_dressphere)
 
+
     for dressphere in this_dressphere_list:
         formulae = parse_chunk(dressphere.hex_chunk)
         stat_names = ["HP", "MP", "STR", "DEF", "MAG", "MDEF", "AGL", "EVA", "ACC", "LUCK"]
@@ -450,6 +451,26 @@ def initiate_dresspheres_new():
                 ability_tuple = (ability_list[i - 1], ability_list[i])
                 dressphere.abilities.append(ability_tuple)
         dressphere.ability_hex_og = ability_hex_og_string
+
+        '''print(dressphere)
+        print("\n")
+        print("Hex Chunk: " + dressphere.hex_chunk)
+        print("\n")
+        print("Big Chunk: " + dressphere.big_chunk)
+        print("\n")
+        print("OG Ability Hex: " + dressphere.ability_hex_og)
+        print("\n")
+        print("OG Stat Hex: " + dressphere.stat_hex_og)
+        print("\n")
+        print("Stats: " + str(dressphere.stat_variables))
+        print("\n")
+        for ability in dressphere.abilities:
+            print("Ability: " + str(ability))'''
+
+        '''stat_names = ["HP", "MP", "STR", "DEF", "MAG", "MDEF", "AGL", "EVA", "ACC", "LUCK"]
+        for stat in stat_names:
+            dressphere.stat_formula(stat, tableprint=True)'''
+
 
     return this_dressphere_list
 
@@ -1486,6 +1507,9 @@ def decode_chunk(chunk_text_val: str):
 
 ending_chunk_test  = get_big_chunks(get_all_segments=True,segment_type="command")[-1]
 c = decode_chunk(ending_chunk_test)
+names = ""
+output = decode_chunk((names))
+print(output)
 
 # #Item
 # global_abilities[0].new_name_text = "Berries" # +3
@@ -1604,6 +1628,7 @@ def change_command_indexes(index_start: int):
 def write_text_hex():
     output_string = ""
     for ability in global_abilities[0:554]:
+
         output_string = output_string + encode_text(ability.new_name_text) + "00" + encode_text(ability.new_help_text)+ "00"
     return output_string
 
@@ -1832,8 +1857,8 @@ test
 
 f1 = read_hex(pathlib.Path("Obselete/command.bin"))[30720*2+40:]
 f2 = decode_chunk(f1)
-f3 = read_hex(pathlib.Path("Obselete/sphere.bin"))[1600:]
-f4 = decode_chunk(f3)
+#f3 = read_hex(pathlib.Path("Obselete/sphere.bin"))[1600:]
+#f4 = decode_chunk(f3)
 test
 
 # print("ending chunk: " + str(len(commands_shuffle_chunks[2])))
@@ -1861,7 +1886,7 @@ test
 # 0A 88 = Blue text                  €y (before word to be Blue'd); €’ (after text to end Blue)
 # 96 = Summon ability help text?     ©
 # 0B 33 = R1 button                  ®3
-
+"""
 mon1mpath = pathlib.Path(resource_path(pathlib.PureWindowsPath("Obselete\monmagic1.bin")))
 monm1bytes = read_hex(mon1mpath)[(27612*2)+14:]
 monm1str = decode_chunk(monm1bytes)
@@ -1881,7 +1906,7 @@ for namey in splitted1:
     num_start = num_start + 1
 
 test
-
+"""
 def translate_ability(hex_byte: str):
     if hex_byte == "7232":
         abc = ""
