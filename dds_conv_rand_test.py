@@ -41,24 +41,31 @@ def transform_rgba_channels(image, red_factor=1, green_factor=1, blue_factor=1, 
 
     return image
 
-img = Image.open("C:\\Git\\c001_top.dds")
-img2 = Image.open("C:\\Git\\c001_bottom.dds")
-transformed_image = img2
-for i in range(10):
-    r = random.uniform(0, 3)
-    g = random.uniform(0, 3)
-    b = random.uniform(0, 3)
-    a = 1 #random.uniform(0, 3)
-    transformed_image = transform_rgba_channels(transformed_image, r, g, b, 1 )
-    transformed_image.show()
+negative = Image.open("C:\\Git\\c001_negative.dds")
+img = Image.open("C:\\Git\\c001.dds").convert("RGBA")
+img2 = Image.open("C:\\Git\\c001_subtract3.dds").convert("L")
 
-img.paste(new, (0, 0), new)
-#img.paste(img2, (0, 0), img2) #WORKING LAYERING
-#img.show()
-#mask = img2.convert("L")
-#mask.show()
-#mask_edited = ImageOps.colorize(mask, black_rand, white_rand, mid_rand, blackpoint, whitepoint, midpoint)
-#mask_edited_conv = mask_edited.convert("RGBA")
-#img3 = ImageChops.add(img, mask_edited_conv) #(img, black_rand, white_rand, mid_rand, blackpoint, whitepoint, midpoint)
-img.show
+# Define colors for mapping
+black_rand = (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
+white_rand = (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
+mid_rand = (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
+
+# Define mapping positions
+blackpoint = 75
+whitepoint = 230
+midpoint = 127
+
+colorized = ImageOps.colorize(img2, black_rand, white_rand, mid_rand, blackpoint, whitepoint, midpoint)
+colorized_conv = colorized.convert("RGBA")
+edited = ImageChops.subtract_modulo(colorized_conv, negative)
+edited.show()
+r = random.uniform(0, 1)
+g = random.uniform(0, 1)
+b = random.uniform(0, 1)
+a = 1 #random.uniform(0, 2)
+transformed_image = transform_rgba_channels(edited, r, g, b, 1)
+transformed_image.show()
+
+img.paste(transformed_image, (0, 0), transformed_image)
+img.show()
 img.save("C:\Git\c001_color.dds")
