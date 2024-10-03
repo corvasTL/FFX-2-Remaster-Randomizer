@@ -1,4 +1,6 @@
 import pathlib
+import tkinter as Tkinter
+from tkinter import font as tkFont
 import random
 import binascii
 from grid import Grid
@@ -9,7 +11,8 @@ import sys
 import os
 import copy
 
-
+#Setup for text measurement
+Tkinter.Frame().destroy()
 
 #Symbols for each grid in ID order
 ordered_syms = ["",
@@ -154,7 +157,8 @@ def initiate_grids(commands):
 
 def symbol_randomize(grids):
     for grid in grids:
-
+        print(grid.name_text + ":\n")
+        print(grid.num_syms + "\n")
         #Add "All Symbols" as an option if it has at least 2 symbols
         if (len(grid.num_syms) > 1) and "6400" not in grid.sym_collect:
             grid.sym_collect.append("6400")
@@ -162,11 +166,13 @@ def symbol_randomize(grids):
         if "0000" not in grid.sym_collect:
             grid.sym_collect.append("0000")
         #Add Red + Green as an option
-        if ("r" and "g" in grid.num_syms) and "0500" not in grid.sym_collect:
+        if ("r" in grid.num_syms) and ("g" in grid.num_syms) and "0500" not in grid.sym_collect:
             grid.sym_collect.append("0500")
+            print("Found r and g, added 0500 to list")
         #Add Blue + Yellow as an option
-        if "y" and "b" in grid.num_syms and "0600" not in grid.sym_collect:
+        if ("y" in grid.num_syms) and ("b" in grid.num_syms) and "0600" not in grid.sym_collect:
             grid.sym_collect.append("0600")
+            print("Found y and b, added 0600 to list")
 
         no_dupes = list(set(grid.sym_collect))
         no_dupes_extend = copy.deepcopy(no_dupes)
@@ -300,28 +306,56 @@ def symbol_check(symbol, syms = ""):
 
         return temp
 
+def split_three(s):
+    txt = tkFont.Font(family="Times New Roman", size=14)
+    print("Original: " + s)
+    words = s.split()
+    part1, part2, part3 = "", "", ""
+    full_1, full_2 = False, False
+
+    for word in words:
+        if (txt.measure(part1) + txt.measure(word) + 5 <= 335) and full_1 == False:
+            part1 += (word + " ")
+        elif (txt.measure(part2) + txt.measure(word) + 5 <= 335) and full_2 == False:
+            part2 += (word + " ")
+            full_1 = True
+        else:
+            part3 += (word + " ")
+            full_2 = True
+
+    split = [part1.strip(), part2.strip(), part3.strip()]
+    print("Split: " + str(split))
+    return split
+
+def split_two(s):
+    txt = tkFont.Font(family="Times New Roman", size=14)
+    print("Original: " + s)
+    words = s.split()
+    part1, part2 = "", ""
+    full_1 = False
+
+    for word in words:
+        if (txt.measure(part1) + txt.measure(word) + 5 <= 335) and full_1 == False:
+            part1 += (word + " ")
+        else:
+            part2 += (word + " ")
+            full_1 = True
+
+    split = [part1.strip(), part2.strip()]
+    print("Split: " + str(split))
+    return split
+
 def build_text(grids, ability_pool):
-    text_chunk = ""
+    total_chunk = ""
     no_check = False
     for grid in grids:
         line_len = 0
-        line_num = 1
-        grid.name_hex = reverse_two_bytes(format(len(text_chunk), '04x'))
-        text_chunk = text_chunk + grid.name_text + "◘"
-        grid.help_hex = reverse_two_bytes(format(len(text_chunk), '04x'))
-        text_chunk = text_chunk + "Grid with randomized abilities.◘"
-        grid.info_line_1_hex = reverse_two_bytes(format(len(text_chunk), '04x'))
-        new_method = '''
+        text_chunk = ""
+
         #Slot 1
         if grid.sym_1_hex != "FF00":
             match = [x for x in ability_pool if (reverse_two_bytes(grid.effect_1_hex) == x[0])]
-            line_len = line_len + len(symbol_check(grid.sym_1_hex, grid.num_syms) + match[0][1])
-            text_chunk = text_chunk + symbol_check(grid.sym_1_hex, grid.num_syms) + match[0][1]
-        if line_len > 15:
-            text_chunk = text_chunk + "◘"
-            grid.info_line_2_hex = reverse_two_bytes(format(len(text_chunk), '04x'))
-            line_num = 2
-            line_len = 0
+            text_chunk = text_chunk + symbol_check(grid.sym_1_hex, grid.num_syms) + match[0][1] + " "
 
         #Slot 2
         if grid.sym_2_hex == grid.sym_1_hex:
@@ -329,24 +363,10 @@ def build_text(grids, ability_pool):
         if grid.sym_2_hex != "FF00":
             match = [x for x in ability_pool if (reverse_two_bytes(grid.effect_2_hex) == x[0])]
             if no_check == True:
-                line_len = line_len + len(", " + match[0][1])
-                text_chunk = text_chunk + ", " + match[0][1] + " "
+                text_chunk = text_chunk[:-1] + ", " + match[0][1] + " "
             else:
-                line_len = line_len + len(symbol_check(grid.sym_2_hex, grid.num_syms) + match[0][1])
                 text_chunk = text_chunk + symbol_check(grid.sym_2_hex, grid.num_syms) + match[0][1] + " "
-        if line_len > 15:
-            if line_num == 1:
-                text_chunk = text_chunk + "◘"
-                grid.info_line_2_hex = reverse_two_bytes(format(len(text_chunk), '04x'))
-                line_num = 2
-                line_len = 0
-            elif line_num == 2:
-                text_chunk = text_chunk + "◘"
-                grid.info_line_3_hex = reverse_two_bytes(format(len(text_chunk), '04x'))
-                line_num = 3
-                line_len = 0
-            elif line_num == 3:
-                print("YIIIIIIIIIIIIIKES: " + grid.name_text)
+
         no_check = False
 
         #Slot 3
@@ -355,24 +375,10 @@ def build_text(grids, ability_pool):
         if grid.sym_3_hex != "FF00":
             match = [x for x in ability_pool if (reverse_two_bytes(grid.effect_3_hex) == x[0])]
             if no_check == True:
-                line_len = line_len + len(", " + match[0][1])
-                text_chunk = text_chunk + ", " + match[0][1] + " "
+                text_chunk = text_chunk[:-1] + ", " + match[0][1] + " "
             else:
-                line_len = line_len + len(symbol_check(grid.sym_3_hex, grid.num_syms) + match[0][1])
                 text_chunk = text_chunk + symbol_check(grid.sym_3_hex, grid.num_syms) + match[0][1] + " "
-        if line_len > 15:
-            if line_num == 1:
-                text_chunk = text_chunk + "◘"
-                grid.info_line_2_hex = reverse_two_bytes(format(len(text_chunk), '04x'))
-                line_num = 2
-                line_len = 0
-            elif line_num == 2:
-                text_chunk = text_chunk + "◘"
-                grid.info_line_3_hex = reverse_two_bytes(format(len(text_chunk), '04x'))
-                line_num = 3
-                line_len = 0
-            elif line_num == 3:
-                print("YIIIIIIIIIIIIIKES: " + grid.name_text)
+
         no_check = False
 
         #Slot 4
@@ -381,24 +387,10 @@ def build_text(grids, ability_pool):
         if grid.sym_4_hex != "FF00":
             match = [x for x in ability_pool if (reverse_two_bytes(grid.effect_4_hex) == x[0])]
             if no_check == True:
-                line_len = line_len + len(", " + match[0][1])
-                text_chunk = text_chunk + ", " + match[0][1] + " "
+                text_chunk = text_chunk[:-1] + ", " + match[0][1] + " "
             else:
-                line_len = line_len + len(symbol_check(grid.sym_4_hex, grid.num_syms) + match[0][1])
                 text_chunk = text_chunk + symbol_check(grid.sym_4_hex, grid.num_syms) + match[0][1] + " "
-        if line_len > 15:
-            if line_num == 1:
-                text_chunk = text_chunk + "◘"
-                grid.info_line_2_hex = reverse_two_bytes(format(len(text_chunk), '04x'))
-                line_num = 2
-                line_len = 0
-            elif line_num == 2:
-                text_chunk = text_chunk + "◘"
-                grid.info_line_3_hex = reverse_two_bytes(format(len(text_chunk), '04x'))
-                line_num = 3
-                line_len = 0
-            elif line_num == 3:
-                print("YIIIIIIIIIIIIIKES: " + grid.name_text)
+
         no_check = False
 
         #Slot 5
@@ -407,24 +399,10 @@ def build_text(grids, ability_pool):
         if grid.sym_5_hex != "FF00":
             match = [x for x in ability_pool if (reverse_two_bytes(grid.effect_5_hex) == x[0])]
             if no_check == True:
-                line_len = line_len + len(", " + match[0][1])
-                text_chunk = text_chunk + ", " + match[0][1] + " "
+                text_chunk = text_chunk[:-1] + ", " + match[0][1] + " "
             else:
-                line_len = line_len + len(symbol_check(grid.sym_5_hex, grid.num_syms) + match[0][1])
                 text_chunk = text_chunk + symbol_check(grid.sym_5_hex, grid.num_syms) + match[0][1] + " "
-        if line_len > 15:
-            if line_num == 1:
-                text_chunk = text_chunk + "◘"
-                grid.info_line_2_hex = reverse_two_bytes(format(len(text_chunk), '04x'))
-                line_num = 2
-                line_len = 0
-            elif line_num == 2:
-                text_chunk = text_chunk + "◘"
-                grid.info_line_3_hex = reverse_two_bytes(format(len(text_chunk), '04x'))
-                line_num = 3
-                line_len = 0
-            elif line_num == 3:
-                print("YIIIIIIIIIIIIIKES: " + grid.name_text)
+
         no_check = False
 
         #Slot 6
@@ -433,24 +411,10 @@ def build_text(grids, ability_pool):
         if grid.sym_6_hex != "FF00":
             match = [x for x in ability_pool if (reverse_two_bytes(grid.effect_6_hex) == x[0])]
             if no_check == True:
-                line_len = line_len + len(", " + match[0][1])
-                text_chunk = text_chunk + ", " + match[0][1] + " "
+                text_chunk = text_chunk[:-1] + ", " + match[0][1] + " "
             else:
-                line_len = line_len + len(symbol_check(grid.sym_6_hex, grid.num_syms) + match[0][1])
                 text_chunk = text_chunk + symbol_check(grid.sym_6_hex, grid.num_syms) + match[0][1] + " "
-        if line_len > 15:
-            if line_num == 1:
-                text_chunk = text_chunk + "◘"
-                grid.info_line_2_hex = reverse_two_bytes(format(len(text_chunk), '04x'))
-                line_num = 2
-                line_len = 0
-            elif line_num == 2:
-                text_chunk = text_chunk + "◘"
-                grid.info_line_3_hex = reverse_two_bytes(format(len(text_chunk), '04x'))
-                line_num = 3
-                line_len = 0
-            elif line_num == 3:
-                print("YIIIIIIIIIIIIIKES: " + grid.name_text)
+
         no_check = False
 
         #Slot 7
@@ -459,24 +423,10 @@ def build_text(grids, ability_pool):
         if grid.sym_7_hex != "FF00":
             match = [x for x in ability_pool if (reverse_two_bytes(grid.effect_7_hex) == x[0])]
             if no_check == True:
-                line_len = line_len + len(", " + match[0][1])
-                text_chunk = text_chunk + ", " + match[0][1] + " "
+                text_chunk = text_chunk[:-1] + ", " + match[0][1] + " "
             else:
-                line_len = line_len + len(symbol_check(grid.sym_7_hex, grid.num_syms) + match[0][1])
                 text_chunk = text_chunk + symbol_check(grid.sym_7_hex, grid.num_syms) + match[0][1] + " "
-        if line_len > 15:
-            if line_num == 1:
-                text_chunk = text_chunk + "◘"
-                grid.info_line_2_hex = reverse_two_bytes(format(len(text_chunk), '04x'))
-                line_num = 2
-                line_len = 0
-            elif line_num == 2:
-                text_chunk = text_chunk + "◘"
-                grid.info_line_3_hex = reverse_two_bytes(format(len(text_chunk), '04x'))
-                line_num = 3
-                line_len = 0
-            elif line_num == 3:
-                print("YIIIIIIIIIIIIIKES: " + grid.name_text)
+
         no_check = False
 
         #Slot 8
@@ -485,73 +435,67 @@ def build_text(grids, ability_pool):
         if grid.sym_8_hex != "FF00":
             match = [x for x in ability_pool if (reverse_two_bytes(grid.effect_8_hex) == x[0])]
             if no_check == True:
-                line_len = line_len + len(", " + match[0][1])
-                text_chunk = text_chunk + ", " + match[0][1] + " "
+                text_chunk = text_chunk[:-1] + ", " + match[0][1] + " "
             else:
-                line_len = line_len + len(symbol_check(grid.sym_8_hex, grid.num_syms) + match[0][1])
                 text_chunk = text_chunk + symbol_check(grid.sym_8_hex, grid.num_syms) + match[0][1] + " "
-        if line_len > 15:
-            if line_num == 1:
-                text_chunk = text_chunk + "◘"
-                grid.info_line_2_hex = reverse_two_bytes(format(len(text_chunk), '04x'))
-                line_num = 2
-                line_len = 0
-            elif line_num == 2:
-                text_chunk = text_chunk + "◘"
-                grid.info_line_3_hex = reverse_two_bytes(format(len(text_chunk), '04x'))
-                line_num = 3
-                line_len = 0
-            elif line_num == 3:
-                print("YIIIIIIIIIIIIIKES: " + grid.name_text)
+
         no_check = False
 
-        if line_num == 1:
-            text_chunk = text_chunk + "◘"
-            grid.info_line_2_hex = reverse_two_bytes(format(len(text_chunk), '04x'))
-            text_chunk = text_chunk + "◘"
-            grid.info_line_3_hex = reverse_two_bytes(format(len(text_chunk), '04x'))
-        elif line_num == 2:
-            text_chunk = text_chunk + "◘"
-            grid.info_line_3_hex = reverse_two_bytes(format(len(text_chunk), '04x'))
-            '''
-        old_examples = ''''''
+        #Split info text
+        txt = tkFont.Font(family="Times New Roman", size=14)
+        if txt.measure(text_chunk) > 335 and txt.measure(text_chunk) < 671:
+            split = split_two(text_chunk)
+        elif txt.measure(text_chunk) > 670:
+            split = split_three(text_chunk)
+        else:
+            split = text_chunk
+        #Grid name and help text
+        grid.name_hex = reverse_two_bytes(format(len(total_chunk), '04x'))
+        total_chunk = total_chunk + grid.name_text + "◘"
+        grid.help_hex = reverse_two_bytes(format(len(total_chunk), '04x'))
+        total_chunk = total_chunk + "Grid with randomized abilities.◘"
 
-        if grid.sym_1_hex != "FF00":
-            match = [x for x in ability_pool if (reverse_two_bytes(grid.effect_1_hex) == x[0])]
-            text_chunk = text_chunk + symbol_check(grid.sym_1_hex, grid.num_syms) + match[0][1] + " "
-        if grid.sym_2_hex != "FF00":
-            match = [x for x in ability_pool if (reverse_two_bytes(grid.effect_2_hex) == x[0])]
-            text_chunk = text_chunk + symbol_check(grid.sym_2_hex, grid.num_syms) + match[0][1] + " "
+        #Info text
+        if (type(split) == list) and (len(split) == 3):
+            grid.info_line_1_hex = reverse_two_bytes(format(len(total_chunk), '04x'))
+            total_chunk = total_chunk + split[0] + "◘"
+            grid.info_line_2_hex = reverse_two_bytes(format(len(total_chunk), '04x'))
+            total_chunk = total_chunk + split[1] + "◘"
+            grid.info_line_3_hex = reverse_two_bytes(format(len(total_chunk), '04x'))
+            total_chunk = total_chunk + split[2] + "◘◘◘"
 
+        elif (type(split) == list) and (len(split) == 2):
+            grid.info_line_1_hex = reverse_two_bytes(format(len(total_chunk), '04x'))
+            total_chunk = total_chunk + split[0] + "◘"
+            grid.info_line_2_hex = reverse_two_bytes(format(len(total_chunk), '04x'))
+            total_chunk = total_chunk + split[1] + "◘"
+            grid.info_line_3_hex = reverse_two_bytes(format(len(total_chunk), '04x'))
+            total_chunk = total_chunk + "◘◘◘"
+
+        else:
+            grid.info_line_1_hex = reverse_two_bytes(format(len(total_chunk), '04x'))
+            total_chunk = total_chunk + split + "◘"
+            grid.info_line_2_hex = reverse_two_bytes(format(len(total_chunk), '04x'))
+            total_chunk = total_chunk + "◘"
+            grid.info_line_3_hex = reverse_two_bytes(format(len(total_chunk), '04x'))
+            total_chunk = total_chunk + "◘◘◘"
+
+    print(total_chunk)
+    return total_chunk
+
+def line_check(line_num, line_len, grid, text_chunk):
+    if line_num == 1:
         text_chunk = text_chunk + "◘"
         grid.info_line_2_hex = reverse_two_bytes(format(len(text_chunk), '04x'))
-
-        if grid.sym_3_hex != "FF00":
-            match = [x for x in ability_pool if (reverse_two_bytes(grid.effect_3_hex) == x[0])]
-            text_chunk = text_chunk + symbol_check(grid.sym_3_hex, grid.num_syms) + match[0][1] + " "
-        if grid.sym_4_hex != "FF00":
-            match = [x for x in ability_pool if (reverse_two_bytes(grid.effect_4_hex) == x[0])]
-            text_chunk = text_chunk + symbol_check(grid.sym_4_hex, grid.num_syms) + match[0][1] + " "
-        if grid.sym_5_hex != "FF00":
-            match = [x for x in ability_pool if (reverse_two_bytes(grid.effect_5_hex) == x[0])]
-            text_chunk = text_chunk + symbol_check(grid.sym_5_hex, grid.num_syms) + match[0][1] + " "
-
+        line_num = 2
+        line_len = 0
+    elif line_num == 2:
         text_chunk = text_chunk + "◘"
         grid.info_line_3_hex = reverse_two_bytes(format(len(text_chunk), '04x'))
-
-        if grid.sym_6_hex != "FF00":
-            match = [x for x in ability_pool if (reverse_two_bytes(grid.effect_6_hex) == x[0])]
-            text_chunk = text_chunk + symbol_check(grid.sym_6_hex, grid.num_syms) + match[0][1] + " "
-        if grid.sym_7_hex != "FF00":
-            match = [x for x in ability_pool if (reverse_two_bytes(grid.effect_7_hex) == x[0])]
-            text_chunk = text_chunk + symbol_check(grid.sym_7_hex, grid.num_syms) + match[0][1] + " "
-        if grid.sym_8_hex != "FF00":
-            match = [x for x in ability_pool if (reverse_two_bytes(grid.effect_8_hex) == x[0])]
-            text_chunk = text_chunk + symbol_check(grid.sym_8_hex, grid.num_syms) + match[0][1]
-
-        text_chunk = text_chunk + "◘◘◘"
-    print(text_chunk)
-    return text_chunk
+        line_num = 3
+        line_len = 0
+    elif line_num == 3:
+        print("YIIIIIIIIIIIIIKES: " + grid.name_text)
 
 
 def build_chunks(grids):
@@ -607,7 +551,6 @@ def grid_bin_to_hex():
     grid_bin = pathlib.Path(grid_bin_path)
     hex_data = read_hex(grid_bin)
     return hex_data
-
 
 class Seed:
     def __init__(self, seed_input: int):
