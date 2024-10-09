@@ -93,14 +93,26 @@ def resource_path(relative_path):
 
     return os.path.join(base_path, relative_path)
 
-grid_bin_path = resource_path(pathlib.PureWindowsPath("Test Files\plate.bin"))
+grid_bin_path = pathlib.Path(resource_path(pathlib.PureWindowsPath("Test Files\plate.bin")))
+seed_path = resource_path(pathlib.PureWindowsPath("Test Files/seed.txt"))
+
+def read_seed():
+    this_seed = 0
+    with open(seed_path, 'r') as seed_file:
+        try:
+            this_seed = int(seed_file.read())
+        except:
+            print("Error reading seed.txt file, please make sure it contains a valid integer.")
+            exit()
+    return this_seed
+
 
 def main():
     commands = cut_command_names()
-    seed_name = int("666777")
+    seed_name = read_seed()
     seed = Seed(hash(seed_name))
     grids, ability_pool = initiate_grids(commands)
-    sym_rand = symbol_randomize(grids)
+    sym_rand = symbol_randomize(grids, seed)
     new_grids, output_text = grid_randomize(sym_rand, ability_pool, seed)
     #output_text = build_text(new_grids, ability_pool)
     output_grids = build_chunks(new_grids)
@@ -111,7 +123,6 @@ def initiate_grids(commands):
     grids = []
     ability_pool = []
     plate_read = grid_bin_to_hex()
-    print(len(plate_read))
     plate_details_chunk = plate_read[64:16448]
     current_grid_start = 0
     for i in range(0,64):
@@ -150,15 +161,12 @@ def initiate_grids(commands):
                 ability_pool.append(match[0])
         grids.append(this_grid)
         current_grid_start = current_grid_start + 256
-        print(this_grid.sym_collect)
 
     return grids, ability_pool
 
 
-def symbol_randomize(grids):
+def symbol_randomize(grids, seed):
     for grid in grids:
-        print(grid.name_text + ":\n")
-        print(grid.num_syms + "\n")
         #Add "All Symbols" as an option if it has at least 2 symbols
         if (len(grid.num_syms) > 1) and "6400" not in grid.sym_collect:
             grid.sym_collect.append("6400")
@@ -168,39 +176,34 @@ def symbol_randomize(grids):
         #Add Red + Green as an option
         if ("r" in grid.num_syms) and ("g" in grid.num_syms) and "0500" not in grid.sym_collect:
             grid.sym_collect.append("0500")
-            print("Found r and g, added 0500 to list")
         #Add Blue + Yellow as an option
         if ("y" in grid.num_syms) and ("b" in grid.num_syms) and "0600" not in grid.sym_collect:
             grid.sym_collect.append("0600")
-            print("Found y and b, added 0600 to list")
 
         no_dupes = list(set(grid.sym_collect))
-        no_dupes_extend = copy.deepcopy(no_dupes)
-
+        no_dupes_extend = (copy.deepcopy(no_dupes))
+        no_dupes.sort()
+        no_dupes_extend.sort()
         for sym in no_dupes:
-            rand = random.randint(0,10)
+            rand = random.Random(seed.call_seed()).randint(0,10)
             while rand <= 2:
-                rand = random.randint(0,10)
-                print(rand)
+                rand = random.Random(seed.call_seed()).randint(0,10)
                 no_dupes_extend.append(sym)
-                print("Added " + sym)
 
         while len(no_dupes_extend)>8:
-            index = random.randint(0, len(no_dupes_extend) - 1)
+            index = random.Random(seed.call_seed()).randint(0, len(no_dupes_extend) - 1)
             no_dupes_extend.pop(index)
 
 
         while (len(no_dupes_extend)>len(grid.num_syms)) and len(no_dupes_extend)>1:
-            rand = random.randint(0, 25)
+            rand = random.Random(seed.call_seed()).randint(0, 25)
             if rand < 5:
                 break
             else:
-                no_dupes_extend.pop(random.randint(0, len(no_dupes_extend) - 1))
-                print("Removed")
+                rand = random.Random(seed.call_seed()).randint(0, len(no_dupes_extend) - 1)
+                no_dupes_extend.pop(rand)
 
         grid.sym_collect = copy.deepcopy(no_dupes_extend)
-        print("Grid symbols finished: ")
-        print(no_dupes_extend)
         grid.assign_syms_from_collect()
 
     return grids
@@ -212,6 +215,7 @@ def grid_randomize(grids, ability_pool, seed):
     random.Random(seed.call_seed()).shuffle(unused_pool)
     total_text = ""
     grid_num = 0
+    unused_bail = 0
     for grid in grids:
         text_fit = False
         grid_num += 1
@@ -284,22 +288,29 @@ def grid_randomize(grids, ability_pool, seed):
 
             #Build text and check if it fits in the box
             temp_chunk, temp_fit = build_text(grid, ability_pool, len(total_text))
-            print(temp_fit)
             if temp_fit == True:
-                print("Hit true")
                 for abi in remove_list:
                     unused_pool.remove(abi)
-                    print("Removed: " + str(abi))
                 total_text = total_text + temp_chunk
                 text_fit = True
             else:
-                print("Hit false")
                 if len(unused_pool) > 0:
                     random.Random((seed.call_seed()) + grid_num).shuffle(unused_pool)
+                    unused_bail += 1
                 else:
                     random.Random((seed.call_seed()) + grid_num).shuffle(ability_pool)
+                    unused_bail += 1
 
+            if unused_bail > 50:
+                grid = bail_reduce(seed, grid)
+                unused_bail = 0
     return grids, total_text
+
+def bail_reduce(seed, grid):
+    selection = random.Random(seed.call_seed()).choice(grid.sym_collect)
+    grid.sym_collect.remove(selection)
+    grid.assign_syms_from_collect()
+    return grid
 
 def symbol_check(symbol, syms = ""):
     if symbol == "0000":
@@ -330,8 +341,7 @@ def symbol_check(symbol, syms = ""):
         return temp
 
 def split_three(s):
-    txt = tkFont.Font(family="Times New Roman", size=14)
-    print("Original: " + s)
+    txt = tkFont.Font(family="Courier New", size=14)
     words = s.split()
     part1, part2, part3 = "", "", ""
     full_1, full_2 = False, False
@@ -347,12 +357,10 @@ def split_three(s):
             full_2 = True
 
     split = [part1.strip(), part2.strip(), part3.strip()]
-    print("Split: " + str(split))
     return split
 
 def split_two(s):
-    txt = tkFont.Font(family="Times New Roman", size=14)
-    print("Original: " + s)
+    txt = tkFont.Font(family="Courier New", size=14)
     words = s.split()
     part1, part2 = "", ""
     full_1 = False
@@ -365,7 +373,6 @@ def split_two(s):
             full_1 = True
 
     split = [part1.strip(), part2.strip()]
-    print("Split: " + str(split))
     return split
 
 def build_text(grid, ability_pool, total_len):
@@ -377,7 +384,6 @@ def build_text(grid, ability_pool, total_len):
     #Slot 1
     if grid.sym_1_hex != "FF00":
         match = [x for x in ability_pool if (reverse_two_bytes(grid.effect_1_hex) == x[0])]
-        print("Match: " + str(match))
         text_chunk = text_chunk + symbol_check(grid.sym_1_hex, grid.num_syms) + match[0][1] + " "
 
     #Slot 2
@@ -385,7 +391,6 @@ def build_text(grid, ability_pool, total_len):
         no_check = True
     if grid.sym_2_hex != "FF00":
         match = [x for x in ability_pool if (reverse_two_bytes(grid.effect_2_hex) == x[0])]
-        print("Match: " + str(match))
         if no_check == True:
             text_chunk = text_chunk[:-1] + ", " + match[0][1] + " "
         else:
@@ -398,7 +403,6 @@ def build_text(grid, ability_pool, total_len):
         no_check = True
     if grid.sym_3_hex != "FF00":
         match = [x for x in ability_pool if (reverse_two_bytes(grid.effect_3_hex) == x[0])]
-        print("Match: " + str(match))
         if no_check == True:
             text_chunk = text_chunk[:-1] + ", " + match[0][1] + " "
         else:
@@ -411,7 +415,6 @@ def build_text(grid, ability_pool, total_len):
         no_check = True
     if grid.sym_4_hex != "FF00":
         match = [x for x in ability_pool if (reverse_two_bytes(grid.effect_4_hex) == x[0])]
-        print("Match: " + str(match))
         if no_check == True:
             text_chunk = text_chunk[:-1] + ", " + match[0][1] + " "
         else:
@@ -424,7 +427,6 @@ def build_text(grid, ability_pool, total_len):
         no_check = True
     if grid.sym_5_hex != "FF00":
         match = [x for x in ability_pool if (reverse_two_bytes(grid.effect_5_hex) == x[0])]
-        print("Match: " + str(match))
         if no_check == True:
             text_chunk = text_chunk[:-1] + ", " + match[0][1] + " "
         else:
@@ -437,7 +439,6 @@ def build_text(grid, ability_pool, total_len):
         no_check = True
     if grid.sym_6_hex != "FF00":
         match = [x for x in ability_pool if (reverse_two_bytes(grid.effect_6_hex) == x[0])]
-        print("Match: " + str(match))
         if no_check == True:
             text_chunk = text_chunk[:-1] + ", " + match[0][1] + " "
         else:
@@ -450,7 +451,6 @@ def build_text(grid, ability_pool, total_len):
         no_check = True
     if grid.sym_7_hex != "FF00":
         match = [x for x in ability_pool if (reverse_two_bytes(grid.effect_7_hex) == x[0])]
-        print("Match: " + str(match))
         if no_check == True:
             text_chunk = text_chunk[:-1] + ", " + match[0][1] + " "
         else:
@@ -463,7 +463,6 @@ def build_text(grid, ability_pool, total_len):
         no_check = True
     if grid.sym_8_hex != "FF00":
         match = [x for x in ability_pool if (reverse_two_bytes(grid.effect_8_hex) == x[0])]
-        print("Match: " + str(match))
         if no_check == True:
             text_chunk = text_chunk[:-1] + ", " + match[0][1] + " "
         else:
@@ -474,34 +473,18 @@ def build_text(grid, ability_pool, total_len):
     txt = tkFont.Font(family="Courier New", size=14)
     symbol_count = [x for x in text_chunk if x == '®']
     cap_count = [x for x in text_chunk if x.isupper() == True]
-    print(str(cap_count))
-    print(grid.name_text)
-    sym_account = (txt.measure(text_chunk) + (len(symbol_count) * 7))
+    sym_account = (txt.measure(text_chunk) + (len(symbol_count) * 10))
     if sym_account > 335 and sym_account < 671:
-        print(txt.measure(text_chunk))
-        print("Hit line 2")
-        print(length_pass)
         split = split_two(text_chunk)
     elif sym_account > 670 and sym_account < 1006:
-        print(txt.measure(text_chunk))
-        print("Hit line 3")
-        print(length_pass)
         split = split_three(text_chunk)
     elif sym_account > 1005:
         length_pass = False
-        print(txt.measure(text_chunk))
-        print("Hit overflow")
-        print(length_pass)
         return total_chunk, length_pass
     else:
-        print(txt.measure(text_chunk))
-        print("Hit line 1")
-        print(length_pass)
         split = text_chunk
 
     #Grid name and help text
-    print("TEXT HIT")
-    print(text_chunk)
     grid.name_hex = reverse_two_bytes(format((len(total_chunk) + total_len), '04x'))
     total_chunk = total_chunk + grid.name_text + "◘"
     grid.help_hex = reverse_two_bytes(format((len(total_chunk) + total_len), '04x'))
@@ -531,23 +514,7 @@ def build_text(grid, ability_pool, total_len):
         total_chunk = total_chunk + "◘"
         grid.info_line_3_hex = reverse_two_bytes(format((len(total_chunk) + total_len), '04x'))
         total_chunk = total_chunk + "◘◘◘"
-    print(total_chunk)
     return total_chunk, length_pass
-
-def line_check(line_num, line_len, grid, text_chunk):
-    if line_num == 1:
-        text_chunk = text_chunk + "◘"
-        grid.info_line_2_hex = reverse_two_bytes(format(len(text_chunk), '04x'))
-        line_num = 2
-        line_len = 0
-    elif line_num == 2:
-        text_chunk = text_chunk + "◘"
-        grid.info_line_3_hex = reverse_two_bytes(format(len(text_chunk), '04x'))
-        line_num = 3
-        line_len = 0
-    elif line_num == 3:
-        print("YIIIIIIIIIIIIIKES: " + grid.name_text)
-
 
 
 def build_chunks(grids):
@@ -582,6 +549,7 @@ def output_plate_bin(grids, text_chunk, seed_name):
     binary_converted = binascii.unhexlify(new_bin)
     with open(filepath, mode="wb") as f:
         f.write(binary_converted)
+    Tkinter.Frame().destroy()
 
 
 def cut_command_names(valid_abilities=True):

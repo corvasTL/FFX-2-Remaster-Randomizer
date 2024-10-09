@@ -1,4 +1,3 @@
-from services import *
 import pathlib
 import random
 import binascii
@@ -10,19 +9,41 @@ import copy
 from treasure import Treasure
 
 
+def resource_path(relative_path):
+    """ Get absolute path to resource, works for dev and for PyInstaller """
+    try:
+        # PyInstaller creates a temp folder and stores path in _MEIPASS
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+        test = ""
+
+    return os.path.join(base_path, relative_path)
+
+treasure_bin_path = resource_path(pathlib.PureWindowsPath("Test Files\\takara.bin"))
+seed_path = resource_path(pathlib.PureWindowsPath("Test Files/seed.txt"))
+
+def read_seed():
+    this_seed = 0
+    with open(seed_path, 'r') as seed_file:
+        try:
+            this_seed = int(seed_file.read())
+        except:
+            print("Error reading seed.txt file, please make sure it contains a valid integer.")
+            exit()
+    return this_seed
 
 def main():
-    takara_path = pathlib.Path("C:\\Git\\FFX-2_Data_Files\\ffx_ps2\\ffx2\\master\\jppc\\battle\\kernel\\takara.bin")
-    print ("Path set")
-    takara_read = read_hex(takara_path)
-    print("Path read")
-    print(takara_read)
+    takara_bin = pathlib.Path(treasure_bin_path)
+    takara_read = read_hex(takara_bin)
+    #print("Path read")
+    #print(takara_read)
 
-    seed_name = int("666777")
+    seed_name = read_seed()
     seed = Seed(hash(seed_name))
 
     result = treasure_randomize(takara_read, seed)
-    print("Output Hex: " + result)
+    #print("Output Hex: " + result)
 
     output_treasure_bin(result, seed_name)
 
@@ -88,10 +109,6 @@ class Seed:
 
     def __repr__(self):
         return str(self.seedy)
-
-
-
-
 
 
 
